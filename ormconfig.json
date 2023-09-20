@@ -1,0 +1,9 @@
+{
+    "type": "postgres",
+    "url": "postgres://postgres:admin@localhost:5432/erp-test",
+    "useNewUrlParser": true,
+    "synchronize": true,
+    "logging": false,
+    "entities": ["src/**/*.entity.ts"],
+    "useUnifiedTopology": true
+}
