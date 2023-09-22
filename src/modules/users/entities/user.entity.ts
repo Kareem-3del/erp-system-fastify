@@ -24,7 +24,7 @@ export class User {
   public email: string;
 
   @Column()
-  private password: string;
+  public password: string;
 
   @CreateDateColumn()
   public created_at: string;

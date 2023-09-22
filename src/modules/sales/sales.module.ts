@@ -4,7 +4,7 @@ import salesService from './sales.service';
 
 export class SalesModule implements IModuleBase {
   fastify: FastifyInstance;
-  prefix = '/users';
+  prefix = '/sales';
 
   constructor(fastify: FastifyInstance) {
     this.fastify = fastify;

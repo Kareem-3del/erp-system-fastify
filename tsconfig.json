@@ -19,6 +19,6 @@
     "strictPropertyInitialization": false,
     "noImplicitAny": false,
     "lib": ["es6"],
-    "typeRoots": ["./node_modules/@types", "./types"]
+    "typeRoots": ["./node_modules/@types", "./src/@types"],
   }
 }

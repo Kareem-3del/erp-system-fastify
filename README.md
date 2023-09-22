@@ -1,8 +1,10 @@
 # Fastify (Project Setup)
 
 ## Run the following commands to get started
-
-```bash
+    
+```bash 
 npm install
-npm run dev
+```
+```bash
+npm run start:dev
 ```

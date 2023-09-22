@@ -8,23 +8,27 @@ export function salesService(fastify: FastifyInstance): ISalesService {
   }
 
   function get(saleId: string) {
-    return fastify.db.sales.findOneOrFail({ _id: saleId });
+    return fastify.db.sales.findOneOrFail({
+      where: { _id: new ObjectId(saleId) },
+    });
   }
 
-  function update(
+  async function update(
     saleId: string,
     productId: string,
     customerId: string,
     price: number,
   ) {
-    return fastify.db.sales.update(
-      { _id: saleId },
-      { productId, customerId, price },
-    );
+    return !!(
+      await fastify.db.sales.update(
+        { _id: new ObjectId(saleId) },
+        { productId, customerId, price },
+      )
+    ).affected;
   }
 
   async function remove(saleId: string) {
-    return !!(await fastify.db.users.deleteOne({ _id: saleId }));
+    return !!(await fastify.db.users.delete({ _id: new ObjectId(saleId) }));
   }
 
   return {
@@ -45,9 +49,14 @@ export interface ISalesService {
     productId: string,
     customerId: string,
     price: number,
-  ): Promise<Sale>;
+  ): Promise<boolean>;
 
   remove(saleId: string): Promise<boolean>;
 }
 
+declare module 'fastify' {
+  interface FastifyInstance {
+    sales: ISalesService;
+  }
+}
 export default salesService;

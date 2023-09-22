@@ -72,7 +72,9 @@ export function usersService(fastify: FastifyInstance) {
   async function getProfile(_id: ObjectId): Promise<User> {
     if (!isUUID(_id)) throw new HttpError('Invalid user id', 400);
     try {
-      return await fastify.db.users.findOneOrFail(_id);
+      return await fastify.db.users.findOneOrFail({
+        where: { _id },
+      });
     } catch (error: any) {
       if (error.code === DUPLICATE_KEY_ERROR_CODE) {
         throw new EmailAlreadyExitsException();
