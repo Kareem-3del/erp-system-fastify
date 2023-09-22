@@ -1,76 +1,108 @@
 import fastify, {
-    FastifyError,
-    FastifyHttpOptions,
-    FastifyInstance,
-    FastifyReply,
-    FastifyRequest,
-    RawServerDefault
+  FastifyHttpOptions,
+  FastifyInstance,
+  FastifyPluginAsync,
+  FastifyPluginCallback,
+  RawServerDefault,
 } from 'fastify';
 
-import db from './plugins/db/db.plugin';
-import fastifyCors, {FastifyCorsOptions} from "@fastify/cors";
-import fastifySwagger from "@fastify/swagger";
-import configHelper from "./utils/helpers/config.helper";
-import fastifySwaggerUi from "@fastify/swagger-ui";
-import {swaggerOptions, swaggerUiOptions} from "./swagger";
-import {ErrorHandler} from "./utils/error-handler";
-import users from "./modules/users";
-import {authenticate, AuthenticationPlugin} from "./plugins/authentication";
-import usersService from "./modules/users/service";
-import errors from "./errors";
+import fastifyCors from '@fastify/cors';
+import fastifySwagger from '@fastify/swagger';
+import configHelper from './utils/helpers/config.helper';
+import fastifySwaggerUi from '@fastify/swagger-ui';
+import { errorHandler } from './exceptions';
+import {
+  CorsConfig,
+  LoggerConfig,
+  SwaggerConfig,
+  SwaggerUiConfig,
+} from './config';
+import { IRoute } from './interfaces';
+import { IModule } from './interfaces';
 
-const envToLogger = {
-    development: {
-        transport: {
-            target: 'pino-pretty',
-            options: {
-                translateTime: 'HH:MM:ss',
-                ignore: 'pid,hostname',
-            },
-        },
-    },
-    production: true,
-    test: false,
-}
+class FastifyServer {
+  public fastify: FastifyInstance;
 
-
-function createServer(options?: FastifyHttpOptions<RawServerDefault, any>): FastifyInstance {
-
-    const server: FastifyInstance = fastify({
-        ...options,
-        logger: envToLogger[configHelper.get("NODE_ENV")] ?? true // defaults to true if no entry matches in the map
+  constructor(
+    plugins: Array<FastifyPluginAsync | FastifyPluginCallback> = [],
+    modules: IModule[] = [],
+    options?: FastifyHttpOptions<RawServerDefault, any>,
+  ) {
+    this.fastify = fastify({
+      ...options,
+      logger: LoggerConfig,
     });
 
+    // Configure Swagger and Swagger UI
+    this.fastify.register(fastifySwagger, SwaggerConfig);
+    this.fastify.register(fastifySwaggerUi, SwaggerUiConfig);
 
-    server.register(fastifySwagger, swaggerOptions);
-    server.register(fastifySwaggerUi, swaggerUiOptions)
-    server.register(fastifyCors, {
-        origin: '*',
-        methods: ['GET', 'PUT', 'POST', 'DELETE', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'Authorization'],
-    } as FastifyCorsOptions)
+    // Configure CORS
+    this.fastify.register(fastifyCors, CorsConfig);
 
-    server.register(db);
+    // Initialize Plugins & Routes
+    this.init(plugins, modules);
 
-    server.decorate('authenticate', authenticate)
+    // Configure Error Handler
+    this.fastify.setErrorHandler(errorHandler);
+  }
 
-    server.register(users)
+  /**
+   * Initialize plugins and modules
+   * @param plugins
+   * @param modules
+   * @private
+   */
+  private init(
+    plugins: Array<FastifyPluginCallback | FastifyPluginAsync>,
+    modules: IModule[],
+  ) {
+    plugins?.forEach((plugin) => this.fastify.register(plugin));
 
-    server.setErrorHandler(function (error: FastifyError, _request: FastifyRequest, reply: FastifyReply): void {
-        const message = error.message
-        if (errors[message]) {
-            reply.statusCode = errors[message].statusCode
-            reply.send(errors[message])
-        }
-        reply.send({
-            code: message,
-            message: errors[message] || message || 'Internal Server Error',
-            statusCode: reply.statusCode
-        })
+    modules.forEach((Module: IModule) => {
+      // Register module
+      this.fastify.register(
+        (instance: FastifyInstance, opts: any, next: () => void) => {
+          try {
+            const module = new Module(this.fastify, opts, next);
+            instance.log.info(`${module.constructor.name} module initialized`);
+            if (module.services) {
+              module.services.forEach((service) => {
+                instance.decorate(service.name, service.handler(instance));
+                instance.log.info(
+                  `Service ${service.name} registered 'fastify.${service.name}' decorator`,
+                );
+              });
+            }
+            if (module.routes)
+              module.routes.forEach((route: IRoute) => {
+                instance.log.info(
+                  `Route ${route.route.method} ${route.route.url} registered`,
+                );
+                instance.route({
+                  ...route.route,
+                  schema: { tags: route.tags, ...route.route.schema },
+                  url: `${module?.prefix || ''}${route.route.url}`,
+                });
+              });
+            next();
+          } catch (e) {
+            instance.log.error(e);
+            throw e;
+          }
+        },
+      );
+    });
+  }
 
-    })
-    return server;
+  public listen() {
+    this.fastify.listen({ port: configHelper.get('port') || 3000 }, (err) => {
+      if (err) {
+        this.fastify.log.error(err);
+        process.exit(1);
+      }
+    });
+  }
 }
 
-
-export default createServer;
+export default FastifyServer;

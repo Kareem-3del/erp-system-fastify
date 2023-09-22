@@ -1,15 +1,19 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import fp from 'fastify-plugin';
 
-export async function authenticate(_request: FastifyRequest, reply: FastifyReply) {
-    const isAuthenticated = false
+export async function authenticate(
+  _request: FastifyRequest,
+  reply: FastifyReply,
+) {
+  const isAuthenticated = false;
 
-    // logic to check if user is authenticated
+  // logic to check if user is authenticated
 
-    if (!isAuthenticated) {
-        reply.code(401).send({ error: 'Unauthorized' });
-    }
+  if (!isAuthenticated) {
+    reply.code(401).send({ error: 'Unauthorized' });
+  }
 }
 
-export async function AuthenticationPlugin (fastify: FastifyInstance):Promise<FastifyInstance> {
-    return fastify.decorate('authenticate', authenticate);
-}
+export default fp(async (server: FastifyInstance): Promise<FastifyInstance> => {
+  return server.decorate('authenticate', authenticate);
+});
